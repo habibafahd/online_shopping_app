@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "561760250720",
+    "project_id": "online-shopping-app-7595d",
+    "storage_bucket": "online-shopping-app-7595d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:561760250720:android:3a04c74f163242a6fa8c05",
+        "android_client_info": {
+          "package_name": "com.example.online_shopping_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1HrHE6Nj5ZTaXPfnZELjVV9c7_oElu8Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
