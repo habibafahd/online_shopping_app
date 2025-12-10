@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'auth_service.dart';
+import '../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -22,11 +24,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (user != null) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => HomeScreen()),
+        MaterialPageRoute(builder: (_) => HomeScreen(onCategoryTap: (_) {})),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed. Check email/password.')),
+        const SnackBar(content: Text('Login failed. Check email/password.')),
       );
     }
   }
@@ -35,43 +37,41 @@ class _LoginScreenState extends State<LoginScreen> {
     await _auth.resetPassword(_emailController.text.trim());
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('Password reset email sent.')));
+    ).showSnackBar(const SnackBar(content: Text('Password reset email sent.')));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Login')),
+      appBar: AppBar(title: const Text('Login')),
       body: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             TextField(
               controller: _emailController,
-              decoration: InputDecoration(labelText: 'Email'),
+              decoration: const InputDecoration(labelText: 'Email'),
             ),
             TextField(
               controller: _passwordController,
               obscureText: true,
-              decoration: InputDecoration(labelText: 'Password'),
+              decoration: const InputDecoration(labelText: 'Password'),
             ),
             Row(
               children: [
                 Checkbox(
                   value: _rememberMe,
                   onChanged: (value) {
-                    setState(() {
-                      _rememberMe = value!;
-                    });
+                    setState(() => _rememberMe = value!);
                   },
                 ),
-                Text('Remember me'),
+                const Text('Remember me'),
               ],
             ),
-            ElevatedButton(onPressed: _login, child: Text('Login')),
+            ElevatedButton(onPressed: _login, child: const Text('Login')),
             TextButton(
               onPressed: _resetPassword,
-              child: Text('Forgot Password?'),
+              child: const Text('Forgot Password?'),
             ),
             TextButton(
               onPressed: () {
@@ -80,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   MaterialPageRoute(builder: (_) => SignupScreen()),
                 );
               },
-              child: Text('Don\'t have an account? Sign Up'),
+              child: const Text('Don\'t have an account? Sign Up'),
             ),
           ],
         ),
