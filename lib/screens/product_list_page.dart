@@ -1,34 +1,20 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
+import 'product_details_page.dart';
 
 class ProductListPage extends StatelessWidget {
   final String categoryName;
   final List<Product> products;
-  final Function(Product) onProductTap;
   final VoidCallback onBack;
+  final void Function(Product, String) onAddToCart;
 
   const ProductListPage({
     super.key,
     required this.categoryName,
     required this.products,
-    required this.onProductTap,
     required this.onBack,
+    required this.onAddToCart,
   });
-
-  IconData getIconForProduct(String name) {
-    switch (name.toLowerCase()) {
-      case 't-shirt':
-        return Icons.checkroom;
-      case 'pants':
-        return Icons.shopping_bag;
-      case 'jacket':
-        return Icons.ac_unit;
-      case 'dress':
-        return Icons.emoji_people;
-      default:
-        return Icons.shopping_bag_outlined;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,53 +26,74 @@ class ProductListPage extends StatelessWidget {
           onPressed: onBack,
         ),
       ),
-      body: Padding(
+      body: GridView.builder(
         padding: const EdgeInsets.all(12),
-        child: GridView.builder(
-          itemCount: products.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.8,
-          ),
-          itemBuilder: (context, index) {
-            final product = products[index];
-            final icon = getIconForProduct(product.name);
-
-            return Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: InkWell(
-                onTap: () => onProductTap(product),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 60, color: Colors.blue),
-                    const SizedBox(height: 10),
-                    Text(
-                      product.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "\$${product.price}",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.blue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+        itemCount: products.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 0.75,
         ),
+        itemBuilder: (context, index) {
+          final product = products[index];
+          return Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    // Optional: open details page
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProductDetailsPage(
+                          product: product,
+                          onAddToCart: onAddToCart,
+                          onBack: () => Navigator.pop(context),
+                        ),
+                      ),
+                    );
+                  },
+                  child: Icon(product.icon, size: 60, color: Colors.blue),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  product.name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "\$${product.price}",
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.blue,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: 100,
+                  height: 36,
+                  child: ElevatedButton(
+                    onPressed: () => onAddToCart(product, "M"),
+                    child: const Text(
+                      "Add to Cart",
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

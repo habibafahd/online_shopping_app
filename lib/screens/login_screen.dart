@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
-import 'home_screen.dart';
+import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,29 +15,41 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _rememberMe = false;
+  bool _loading = false;
 
   void _login() async {
-    final user = await _auth.signIn(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
-    if (user != null) {
-      Navigator.pushReplacement(
+    setState(() => _loading = true);
+    try {
+      final user = await _auth.login(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
+      if (user != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainScreen()),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
         context,
-        MaterialPageRoute(builder: (_) => HomeScreen(onCategoryTap: (_) {})),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login failed. Check email/password.')),
-      );
+      ).showSnackBar(SnackBar(content: Text("Login failed: ${e.toString()}")));
+    } finally {
+      setState(() => _loading = false);
     }
   }
 
   void _resetPassword() async {
-    await _auth.resetPassword(_emailController.text.trim());
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Password reset email sent.')));
+    try {
+      await _auth.resetPassword(_emailController.text.trim());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset email sent.')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+    }
   }
 
   @override
@@ -68,7 +80,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text('Remember me'),
               ],
             ),
-            ElevatedButton(onPressed: _login, child: const Text('Login')),
+            _loading
+                ? const CircularProgressIndicator()
+                : ElevatedButton(onPressed: _login, child: const Text('Login')),
             TextButton(
               onPressed: _resetPassword,
               child: const Text('Forgot Password?'),
@@ -77,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => SignupScreen()),
+                  MaterialPageRoute(builder: (_) => const SignupScreen()),
                 );
               },
               child: const Text('Don\'t have an account? Sign Up'),

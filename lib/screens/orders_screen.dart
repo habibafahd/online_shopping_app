@@ -1,40 +1,56 @@
 import 'package:flutter/material.dart';
-import '../services/order_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
-import '../models/order.dart' as my_order;
 
 class OrdersScreen extends StatelessWidget {
   const OrdersScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final userId = AuthService().currentUserId();
+    final String? userId = AuthService().currentUserId();
+
+    if (userId == null) {
+      return const Scaffold(
+        body: Center(child: Text("Please login to see orders")),
+      );
+    }
+
+    final ordersRef = FirebaseFirestore.instance
+        .collection('orders')
+        .where('userId', isEqualTo: userId)
+        .orderBy('date', descending: true);
 
     return Scaffold(
       appBar: AppBar(title: const Text("Orders")),
-      body: FutureBuilder<List<my_order.Order>>(
-        future: OrderService().getOrdersByUser(userId),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: ordersRef.snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text("Error: ${snapshot.error}"));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          } else if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(child: Text("No orders yet"));
           }
 
-          final orders = snapshot.data!;
+          final docs = snapshot.data!.docs;
+
           return ListView.builder(
-            itemCount: orders.length,
+            itemCount: docs.length,
             itemBuilder: (context, index) {
-              final order = orders[index];
+              final data = docs[index].data() as Map<String, dynamic>;
+              final items = (data['items'] as List<dynamic>)
+                  .map((e) => "${e['name']} x${e['quantity']}")
+                  .join(", ");
+
+              final date = (data['date'] as Timestamp).toDate();
+
               return Card(
                 margin: const EdgeInsets.all(8),
                 child: ListTile(
-                  title: Text("Order #${order.id}"),
+                  title: Text("Order #${data['id']}"),
                   subtitle: Text(
-                    "Total: \$${order.total.toStringAsFixed(2)}\n"
-                    "Date: ${order.date.toLocal()}",
+                    "Items: $items\nTotal: \$${data['total']}\nDate: ${date.toLocal()}",
                   ),
                 ),
               );

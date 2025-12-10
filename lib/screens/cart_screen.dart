@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/cart_item.dart';
+import '../services/order_service.dart';
+import '../services/auth_service.dart';
+import '../models/order.dart' as my_order;
 
 class CartScreen extends StatefulWidget {
   final List<CartItem> cart;
@@ -20,8 +23,29 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   double get total => widget.cart.fold(
     0,
-    (sum, item) => sum + item.product.price * item.quantity,
+    (sum, item) => sum + (item.product.price * item.quantity),
   );
+
+  Future<void> _checkout() async {
+    final userId = AuthService().currentUserId();
+    if (userId == null) return;
+
+    final order = my_order.Order(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      total: total,
+      items: widget.cart.map((c) => c.toMap()).toList(),
+      date: DateTime.now(),
+      userId: userId,
+    );
+
+    await OrderService().addOrder(order);
+    widget.cart.clear();
+    widget.onCartChanged();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Order submitted successfully!")),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,11 +138,7 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                       ),
                       ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Order submitted!")),
-                          );
-                        },
+                        onPressed: _checkout,
                         child: const Text("Checkout"),
                       ),
                     ],

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
-import '../services/user_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -10,26 +10,45 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String gender = "";
-  DateTime birthday = DateTime.now();
+  String gender = "Male";
+  DateTime birthday = DateTime(2000, 1, 1);
   String email = "";
   String phone = "";
+
+  final String? userId = AuthService().currentUserId();
+
+  final _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
-    loadProfile();
+    _loadUserData();
   }
 
-  void loadProfile() async {
-    final userId = AuthService().currentUserId();
-    final profile = await UserService().getUserProfile(userId);
-    setState(() {
-      gender = profile.gender;
-      birthday = profile.birthday;
-      email = profile.email;
-      phone = profile.phone;
-    });
+  Future<void> _loadUserData() async {
+    if (userId == null) return;
+
+    final doc = await _firestore.collection('users').doc(userId).get();
+    if (doc.exists) {
+      final data = doc.data()!;
+      setState(() {
+        email = data['email'] ?? '';
+        phone = data['phone'] ?? '';
+        gender = data['gender'] ?? 'Male';
+        birthday = (data['birthday'] as Timestamp?)?.toDate() ?? birthday;
+      });
+    }
+  }
+
+  Future<void> _updateUserData() async {
+    if (userId == null) return;
+
+    await _firestore.collection('users').doc(userId).set({
+      'email': email,
+      'phone': phone,
+      'gender': gender,
+      'birthday': birthday,
+    }, SetOptions(merge: true));
   }
 
   Future<void> pickBirthday() async {
@@ -41,41 +60,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (picked != null) {
       setState(() => birthday = picked);
-      final userId = AuthService().currentUserId();
-      await UserService().updateUserProfile(userId, birthday: birthday);
+      _updateUserData();
     }
   }
 
-  void editField(String field, String currentValue) {
-    TextEditingController controller = TextEditingController(
-      text: currentValue,
-    );
+  void editEmail() {
+    TextEditingController controller = TextEditingController(text: email);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Edit $field"),
-        content: TextField(controller: controller),
+        title: const Text("Edit Email"),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.emailAddress,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("Cancel"),
           ),
           TextButton(
-            onPressed: () async {
-              final userId = AuthService().currentUserId();
-              if (field == "Email") {
-                await UserService().updateUserProfile(
-                  userId,
-                  email: controller.text,
-                );
-                setState(() => email = controller.text);
-              } else if (field == "Phone") {
-                await UserService().updateUserProfile(
-                  userId,
-                  phone: controller.text,
-                );
-                setState(() => phone = controller.text);
-              }
+            onPressed: () {
+              setState(() => email = controller.text);
+              _updateUserData();
+              Navigator.pop(context);
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void editPhone() {
+    TextEditingController controller = TextEditingController(text: phone);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Edit Phone"),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.phone,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() => phone = controller.text);
+              _updateUserData();
               Navigator.pop(context);
             },
             child: const Text("Save"),
@@ -89,34 +124,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Profile")),
-      body: ListView(
+      body: Padding(
         padding: const EdgeInsets.all(16),
-        children: [
-          ProfileRow(
-            icon: Icons.male,
-            label: "Gender",
-            value: gender,
-            onTap: () {},
-          ),
-          ProfileRow(
-            icon: Icons.cake,
-            label: "Birthday",
-            value: "${birthday.toLocal()}".split(' ')[0],
-            onTap: pickBirthday,
-          ),
-          ProfileRow(
-            icon: Icons.email,
-            label: "Email",
-            value: email,
-            onTap: () => editField("Email", email),
-          ),
-          ProfileRow(
-            icon: Icons.phone,
-            label: "Phone",
-            value: phone,
-            onTap: () => editField("Phone", phone),
-          ),
-        ],
+        child: ListView(
+          children: [
+            Center(
+              child: Column(
+                children: const [
+                  CircleAvatar(radius: 50, backgroundColor: Colors.grey),
+                  SizedBox(height: 12),
+                  Text(
+                    "Your Name",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 4),
+                  Text("@username", style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
+            ProfileRow(
+              icon: Icons.male,
+              label: "Gender",
+              value: gender,
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text("Select Gender"),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: ["Male", "Female"].map((g) {
+                        return RadioListTile(
+                          value: g,
+                          groupValue: gender,
+                          title: Text(g),
+                          onChanged: (String? val) {
+                            setState(() => gender = val!);
+                            _updateUserData();
+                            Navigator.pop(context);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                );
+              },
+            ),
+            ProfileRow(
+              icon: Icons.cake,
+              label: "Birthday",
+              value: "${birthday.toLocal()}".split(' ')[0],
+              onTap: pickBirthday,
+            ),
+            ProfileRow(
+              icon: Icons.email,
+              label: "Email",
+              value: email,
+              onTap: editEmail,
+            ),
+            ProfileRow(
+              icon: Icons.phone,
+              label: "Phone",
+              value: phone,
+              onTap: editPhone,
+            ),
+          ],
+        ),
       ),
     );
   }

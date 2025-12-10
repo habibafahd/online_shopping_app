@@ -89,21 +89,29 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             ),
             const SizedBox(height: 20),
             const Text(
-              "Product Description",
+              "Description",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
-              "This is a detailed description of the product.",
-              style: TextStyle(fontSize: 16),
+            Text(
+              widget.product.description ?? "No description available",
+              style: const TextStyle(fontSize: 16),
             ),
             const Spacer(),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: () =>
-                    widget.onAddToCart(widget.product, selectedSize),
+                onPressed: () {
+                  widget.onAddToCart(widget.product, selectedSize);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        "Added ${widget.product.name} ($selectedSize) to cart",
+                      ),
+                    ),
+                  );
+                },
                 child: const Text(
                   "Add to Cart",
                   style: TextStyle(fontSize: 18),
