@@ -3,7 +3,7 @@ import '../models/cart_item.dart';
 import '../models/product.dart';
 import '../services/order_service.dart';
 import '../services/auth_service.dart';
-import '../models/order.dart' as my_order;
+import 'feedback_screen.dart';
 
 class CartScreen extends StatefulWidget {
   final List<CartItem> cart;
@@ -29,22 +29,83 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _checkout() async {
     final userId = AuthService().currentUserId();
-    if (userId == null) return;
+    if (userId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("You must be logged in!")));
+      return;
+    }
 
-    final order = my_order.Order(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      total: total,
-      items: widget.cart.map((c) => c.toMap()).toList(),
-      date: DateTime.now(),
-      userId: userId,
+    String phone = '';
+    String address = '';
+
+    // Collect phone and address
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Enter your details"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                decoration: const InputDecoration(labelText: "Phone"),
+                keyboardType: TextInputType.phone,
+                onChanged: (val) => phone = val,
+              ),
+              TextField(
+                decoration: const InputDecoration(labelText: "Address"),
+                onChanged: (val) => address = val,
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                if (phone.isEmpty || address.isEmpty) return;
+                Navigator.pop(context);
+              },
+              child: const Text("Continue"),
+            ),
+          ],
+        );
+      },
     );
 
-    await OrderService().addOrder(order);
+    if (phone.isEmpty || address.isEmpty) return;
+
+    // Create order
+    final orderId = DateTime.now().millisecondsSinceEpoch.toString();
+    await OrderService().addOrder(
+      userId: userId,
+      orderId: orderId,
+      cart: widget.cart,
+      total: total,
+      phone: phone,
+      address: address,
+    );
+
     widget.cart.clear();
     widget.onCartChanged();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Order submitted successfully!")),
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("Order placed successfully!")));
+
+    // Open feedback screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FeedbackScreen(
+          orderId: orderId,
+          onFeedbackSubmitted: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Thank you for your feedback!")),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -140,7 +201,7 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                       ElevatedButton(
                         onPressed: _checkout,
-                        child: const Text("Checkout"),
+                        child: const Text("Place Order"),
                       ),
                     ],
                   ),
