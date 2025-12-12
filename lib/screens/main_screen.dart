@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../models/cart_item.dart';
-import 'cart_screen.dart';
-import 'product_list_page.dart';
 import 'home_screen.dart';
+import 'cart_screen.dart';
 import 'profile_screen.dart';
 import '../services/product_service.dart';
+import 'product_list_page.dart';
+import 'product_details_page.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -18,13 +19,18 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   List<CartItem> cart = [];
   late Widget currentScreen;
+
   final ProductService _productService = ProductService();
 
   @override
   void initState() {
     super.initState();
-    // Pass addToCart to HomeScreen
-    currentScreen = HomeScreen(onAddToCart: addToCart);
+    // Start with HomeScreen and pass callbacks
+    currentScreen = HomeScreen(
+      onAddToCart: addToCart,
+      onOpenPage: openScreen,
+      onCategoryTap: onCategoryTap,
+    );
   }
 
   void openScreen(Widget screen) {
@@ -34,11 +40,11 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void addToCart(Product product, [String size = "M"]) {
-    final existing = cart.indexWhere(
+    final index = cart.indexWhere(
       (item) => item.product.id == product.id && item.size == size,
     );
-    if (existing >= 0) {
-      cart[existing].quantity++;
+    if (index >= 0) {
+      cart[index].quantity++;
     } else {
       cart.add(CartItem(product: product, size: size));
     }
@@ -48,6 +54,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void onCategoryTap(String categoryName) async {
+    // Show loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -58,22 +65,18 @@ class _MainScreenState extends State<MainScreen> {
       final products = await _productService.getProductsByCategory(
         categoryName,
       );
-
       Navigator.pop(context); // remove loading indicator
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProductListPage(
-            categoryName: categoryName,
-            products: products,
-            onBack: () => Navigator.pop(context),
-            onAddToCart: addToCart, // pass MainScreen's cart method
-          ),
+      openScreen(
+        ProductListPage(
+          categoryName: categoryName,
+          products: products,
+          onAddToCart: addToCart,
+          onOpenPage: openScreen,
         ),
       );
     } catch (e) {
-      Navigator.pop(context); // remove loading indicator
+      Navigator.pop(context);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Failed to load products: $e")));
@@ -85,7 +88,13 @@ class _MainScreenState extends State<MainScreen> {
       CartScreen(
         cart: cart,
         onCartChanged: () => setState(() {}),
-        onBack: () => openScreen(HomeScreen(onAddToCart: addToCart)),
+        onBack: () => openScreen(
+          HomeScreen(
+            onAddToCart: addToCart,
+            onOpenPage: openScreen,
+            onCategoryTap: onCategoryTap,
+          ),
+        ),
       ),
     );
   }
@@ -99,7 +108,6 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: currentScreen,
       bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
         currentIndex: _selectedIndex,
         selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
@@ -107,7 +115,13 @@ class _MainScreenState extends State<MainScreen> {
           setState(() {
             _selectedIndex = index;
             if (index == 0) {
-              openScreen(HomeScreen(onAddToCart: addToCart));
+              openScreen(
+                HomeScreen(
+                  onAddToCart: addToCart,
+                  onOpenPage: openScreen,
+                  onCategoryTap: onCategoryTap,
+                ),
+              );
             } else if (index == 1) {
               onCartTap();
             } else if (index == 2) {

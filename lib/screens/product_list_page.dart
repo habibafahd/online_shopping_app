@@ -5,15 +5,15 @@ import 'product_details_page.dart';
 class ProductListPage extends StatefulWidget {
   final String categoryName;
   final List<Product> products;
-  final VoidCallback onBack;
   final Function(Product, String) onAddToCart;
+  final Function(Widget) onOpenPage;
 
   const ProductListPage({
     super.key,
     required this.categoryName,
     required this.products,
-    required this.onBack,
     required this.onAddToCart,
+    required this.onOpenPage,
   });
 
   @override
@@ -29,30 +29,21 @@ class _ProductListPageState extends State<ProductListPage> {
         .where((p) => p.name.toLowerCase().contains(searchText.toLowerCase()))
         .toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.categoryName),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: widget.onBack,
-        ),
-      ),
-      body: Column(
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              decoration: const InputDecoration(
-                hintText: "Search in category...",
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (val) => setState(() => searchText = val),
+          TextField(
+            decoration: const InputDecoration(
+              hintText: "Search in category...",
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
             ),
+            onChanged: (val) => setState(() => searchText = val),
           ),
+          const SizedBox(height: 12),
           Expanded(
             child: GridView.builder(
-              padding: const EdgeInsets.all(12),
               itemCount: filteredProducts.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
@@ -64,13 +55,17 @@ class _ProductListPageState extends State<ProductListPage> {
                 final product = filteredProducts[index];
                 return GestureDetector(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ProductDetailsPage(
-                          product: product,
-                          onAddToCart: widget.onAddToCart,
-                          onBack: () => Navigator.pop(context),
+                    widget.onOpenPage(
+                      ProductDetailsPage(
+                        product: product,
+                        onAddToCart: widget.onAddToCart,
+                        onBack: () => widget.onOpenPage(
+                          ProductListPage(
+                            categoryName: widget.categoryName,
+                            products: widget.products,
+                            onAddToCart: widget.onAddToCart,
+                            onOpenPage: widget.onOpenPage,
+                          ),
                         ),
                       ),
                     );

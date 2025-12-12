@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/cart_item.dart';
+import '../models/product.dart';
 import '../services/order_service.dart';
 import '../services/auth_service.dart';
 import '../models/order.dart' as my_order;
