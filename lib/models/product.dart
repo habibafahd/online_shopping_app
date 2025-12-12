@@ -3,42 +3,66 @@ import 'package:flutter/material.dart';
 class Product {
   final String id;
   final String name;
-  final IconData icon;
+  final String category;
   final double price;
   final int stock;
-  final String category; // NEW
-  final String? description; // NEW
+  final String? description;
+  final IconData icon;
 
   Product({
     required this.id,
     required this.name,
-    required this.icon,
+    required this.category,
     required this.price,
     this.stock = 10,
-    required this.category,
     this.description,
+    required this.icon,
   });
 
-  factory Product.fromMap(Map<String, dynamic> data, String documentId) {
+  // Convert IconData to string for Firestore
+  String get iconString {
+    if (icon == Icons.checkroom) return "checkroom";
+    if (icon == Icons.shopping_bag) return "shopping_bag";
+    if (icon == Icons.ac_unit) return "ac_unit";
+    return "category";
+  }
+
+  // Optional: factory from Firestore map
+  factory Product.fromMap(Map<String, dynamic> map, String id) {
+    IconData iconData;
+    switch (map['icon']) {
+      case "checkroom":
+        iconData = Icons.checkroom;
+        break;
+      case "shopping_bag":
+        iconData = Icons.shopping_bag;
+        break;
+      case "ac_unit":
+        iconData = Icons.ac_unit;
+        break;
+      default:
+        iconData = Icons.category;
+    }
     return Product(
-      id: documentId,
-      name: data['name'],
-      icon: IconData(data['icon'], fontFamily: 'MaterialIcons'),
-      price: (data['price'] as num).toDouble(),
-      stock: data['stock'] ?? 10,
-      category: data['category'] ?? "Uncategorized",
-      description: data['description'],
+      id: id,
+      name: map['name'] ?? '',
+      category: map['category'] ?? '',
+      price: (map['price'] ?? 0).toDouble(),
+      stock: map['stock'] ?? 10,
+      description: map['description'],
+      icon: iconData,
     );
   }
 
+  // Convert to map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'name': name,
-      'icon': icon.codePoint,
+      'category': category,
       'price': price,
       'stock': stock,
-      'category': category,
       'description': description,
+      'icon': iconString,
     };
   }
 }

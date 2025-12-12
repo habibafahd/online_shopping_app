@@ -3,9 +3,9 @@ import '../models/product.dart';
 import '../models/cart_item.dart';
 import 'cart_screen.dart';
 import 'product_list_page.dart';
-import 'product_details_page.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
+import '../services/product_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -18,11 +18,13 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   List<CartItem> cart = [];
   late Widget currentScreen;
+  final ProductService _productService = ProductService();
 
   @override
   void initState() {
     super.initState();
-    currentScreen = HomeScreen(onCategoryTap: onCategoryTap);
+    // Pass addToCart to HomeScreen
+    currentScreen = HomeScreen(onAddToCart: addToCart);
   }
 
   void openScreen(Widget screen) {
@@ -45,18 +47,37 @@ class _MainScreenState extends State<MainScreen> {
     ).showSnackBar(SnackBar(content: Text("Added ${product.name} to cart")));
   }
 
-  void onCategoryTap(String categoryName) {
-    // Here, you will later load products from Firebase for that category
-    List<Product> products = []; // start empty; admin adds products to Firebase
-
-    openScreen(
-      ProductListPage(
-        categoryName: categoryName,
-        products: products,
-        onBack: () => openScreen(HomeScreen(onCategoryTap: onCategoryTap)),
-        onAddToCart: addToCart,
-      ),
+  void onCategoryTap(String categoryName) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      final products = await _productService.getProductsByCategory(
+        categoryName,
+      );
+
+      Navigator.pop(context); // remove loading indicator
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductListPage(
+            categoryName: categoryName,
+            products: products,
+            onBack: () => Navigator.pop(context),
+            onAddToCart: addToCart, // pass MainScreen's cart method
+          ),
+        ),
+      );
+    } catch (e) {
+      Navigator.pop(context); // remove loading indicator
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load products: $e")));
+    }
   }
 
   void onCartTap() {
@@ -64,7 +85,7 @@ class _MainScreenState extends State<MainScreen> {
       CartScreen(
         cart: cart,
         onCartChanged: () => setState(() {}),
-        onBack: () => openScreen(HomeScreen(onCategoryTap: onCategoryTap)),
+        onBack: () => openScreen(HomeScreen(onAddToCart: addToCart)),
       ),
     );
   }
@@ -86,7 +107,7 @@ class _MainScreenState extends State<MainScreen> {
           setState(() {
             _selectedIndex = index;
             if (index == 0) {
-              openScreen(HomeScreen(onCategoryTap: onCategoryTap));
+              openScreen(HomeScreen(onAddToCart: addToCart));
             } else if (index == 1) {
               onCartTap();
             } else if (index == 2) {

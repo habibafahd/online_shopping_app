@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../services/product_service.dart';
 import '../models/product.dart';
+import 'product_list_page.dart';
 
 class HomeScreen extends StatefulWidget {
-  final Function(String) onCategoryTap;
+  final Function(Product, String) onAddToCart;
 
-  const HomeScreen({super.key, required this.onCategoryTap});
+  const HomeScreen({super.key, required this.onAddToCart});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -20,6 +22,40 @@ class _HomeScreenState extends State<HomeScreen> {
     {"icon": Icons.ac_unit, "name": "Jacket"},
     {"icon": Icons.ac_unit, "name": "Dress"},
   ];
+
+  final ProductService _productService = ProductService();
+
+  // Fetch products for selected category and navigate
+  void _onCategoryTap(String category) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final products = await _productService.getProductsByCategory(category);
+
+      Navigator.pop(context); // remove loading indicator
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductListPage(
+            categoryName: category,
+            products: products,
+            onBack: () => Navigator.pop(context),
+            onAddToCart: widget.onAddToCart,
+          ),
+        ),
+      );
+    } catch (e) {
+      Navigator.pop(context); // remove loading indicator
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load products: $e")));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () => widget.onCategoryTap(item["name"]),
+              onTap: () => _onCategoryTap(item["name"]),
             ),
           );
         })
