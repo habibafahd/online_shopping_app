@@ -5,8 +5,22 @@ class ProductService {
   final CollectionReference productsCollection = FirebaseFirestore.instance
       .collection('products');
 
+  // Get all products (optional)
   Future<List<Product>> getAllProducts() async {
     final snapshot = await productsCollection.get();
+    return snapshot.docs
+        .map(
+          (doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+        )
+        .toList();
+  }
+
+  // Get products by category (new)
+  Future<List<Product>> getProductsByCategory(String category) async {
+    final snapshot = await productsCollection
+        .where('category', isEqualTo: category)
+        .get();
+
     return snapshot.docs
         .map(
           (doc) => Product.fromMap(doc.data() as Map<String, dynamic>, doc.id),

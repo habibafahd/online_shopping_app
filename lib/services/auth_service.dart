@@ -6,6 +6,9 @@ class AuthService {
   // Get current user ID
   String? currentUserId() => _auth.currentUser?.uid;
 
+  // Get current user email
+  String? currentUserEmail() => _auth.currentUser?.email;
+
   // Sign up
   Future<User?> signUp(String email, String password) async {
     try {
@@ -15,7 +18,8 @@ class AuthService {
       );
       return credential.user;
     } catch (e) {
-      throw Exception("Sign Up Error: $e");
+      print("Sign Up Error: $e");
+      return null;
     }
   }
 
@@ -28,7 +32,8 @@ class AuthService {
       );
       return credential.user;
     } catch (e) {
-      throw Exception("Login Error: $e");
+      print("Login Error: $e");
+      return null;
     }
   }
 
@@ -39,6 +44,10 @@ class AuthService {
 
   // Password Reset
   Future<void> resetPassword(String email) async {
-    await _auth.sendPasswordResetEmail(email: email);
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } catch (e) {
+      print("Reset Password Error: $e");
+    }
   }
 }

@@ -15,41 +15,29 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _rememberMe = false;
-  bool _loading = false;
 
   void _login() async {
-    setState(() => _loading = true);
-    try {
-      final user = await _auth.login(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-      );
-      if (user != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainScreen()),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
+    final user = await _auth.login(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+    );
+    if (user != null) {
+      Navigator.pushReplacement(
         context,
-      ).showSnackBar(SnackBar(content: Text("Login failed: ${e.toString()}")));
-    } finally {
-      setState(() => _loading = false);
+        MaterialPageRoute(builder: (_) => const MainScreen()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login failed. Check email/password.')),
+      );
     }
   }
 
   void _resetPassword() async {
-    try {
-      await _auth.resetPassword(_emailController.text.trim());
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password reset email sent.')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
-    }
+    await _auth.resetPassword(_emailController.text.trim());
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Password reset email sent.')));
   }
 
   @override
@@ -80,9 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text('Remember me'),
               ],
             ),
-            _loading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(onPressed: _login, child: const Text('Login')),
+            ElevatedButton(onPressed: _login, child: const Text('Login')),
             TextButton(
               onPressed: _resetPassword,
               child: const Text('Forgot Password?'),

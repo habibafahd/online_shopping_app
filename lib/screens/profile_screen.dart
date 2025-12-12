@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,42 +13,57 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String gender = "Male";
   DateTime birthday = DateTime(2000, 1, 1);
-  String email = "";
   String phone = "";
+  String username = "@username";
 
-  final String? userId = AuthService().currentUserId();
-
+  final AuthService auth = AuthService();
   final _firestore = FirebaseFirestore.instance;
+  late String userId;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    final uid = auth.currentUserId();
+    final email = auth.currentUserEmail();
+    if (uid != null && email != null) {
+      userId = uid;
+      username = email.split('@')[0]; // username from email
+      _loadUserData();
+    }
   }
 
   Future<void> _loadUserData() async {
-    if (userId == null) return;
-
-    final doc = await _firestore.collection('users').doc(userId).get();
-    if (doc.exists) {
-      final data = doc.data()!;
-      setState(() {
-        email = data['email'] ?? '';
-        phone = data['phone'] ?? '';
-        gender = data['gender'] ?? 'Male';
-        birthday = (data['birthday'] as Timestamp?)?.toDate() ?? birthday;
-      });
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        setState(() {
+          phone = data['phone'] ?? '';
+          gender = data['gender'] ?? 'Male';
+          birthday = (data['birthday'] as Timestamp?)?.toDate() ?? birthday;
+          // username stays as email prefix
+        });
+      } else {
+        // create default document
+        await _firestore.collection('users').doc(userId).set({
+          'phone': phone,
+          'gender': gender,
+          'birthday': Timestamp.fromDate(birthday),
+          'username': username, // from email
+        });
+      }
+    } catch (e) {
+      print("Error loading user data: $e");
     }
   }
 
   Future<void> _updateUserData() async {
-    if (userId == null) return;
-
+    if (userId.isEmpty) return; // safety check
     await _firestore.collection('users').doc(userId).set({
-      'email': email,
       'phone': phone,
       'gender': gender,
-      'birthday': birthday,
+      'birthday': Timestamp.fromDate(birthday),
+      'username': username,
     }, SetOptions(merge: true));
   }
 
@@ -58,38 +74,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
-    if (picked != null) {
+    if (picked != null && picked != birthday) {
       setState(() => birthday = picked);
-      _updateUserData();
+      await _updateUserData(); // save immediately
     }
-  }
-
-  void editEmail() {
-    TextEditingController controller = TextEditingController(text: email);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Edit Email"),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.emailAddress,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() => email = controller.text);
-              _updateUserData();
-              Navigator.pop(context);
-            },
-            child: const Text("Save"),
-          ),
-        ],
-      ),
-    );
   }
 
   void editPhone() {
@@ -108,15 +96,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text("Cancel"),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               setState(() => phone = controller.text);
-              _updateUserData();
+              await _updateUserData();
               Navigator.pop(context);
             },
             child: const Text("Save"),
           ),
         ],
       ),
+    );
+  }
+
+  void logout() async {
+    await auth.logout();
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
     );
   }
 
@@ -130,23 +127,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             Center(
               child: Column(
-                children: const [
-                  CircleAvatar(radius: 50, backgroundColor: Colors.grey),
-                  SizedBox(height: 12),
+                children: [
+                  const CircleAvatar(radius: 50, backgroundColor: Colors.grey),
+                  const SizedBox(height: 12),
                   Text(
-                    "Your Name",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    username,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  SizedBox(height: 4),
-                  Text("@username", style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 4),
+                  Text(
+                    "@$username",
+                    style: const TextStyle(color: Colors.grey),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 30),
-            ProfileRow(
-              icon: Icons.male,
-              label: "Gender",
-              value: gender,
+            ListTile(
+              leading: const Icon(Icons.male, color: Colors.blue),
+              title: const Text(
+                "Gender",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(gender),
+              trailing: const Icon(Icons.edit),
               onTap: () {
                 showDialog(
                   context: context,
@@ -159,10 +166,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           value: g,
                           groupValue: gender,
                           title: Text(g),
-                          onChanged: (String? val) {
-                            setState(() => gender = val!);
-                            _updateUserData();
-                            Navigator.pop(context);
+                          onChanged: (String? val) async {
+                            if (val != null) {
+                              setState(() => gender = val);
+                              await _updateUserData();
+                              Navigator.pop(context);
+                            }
                           },
                         );
                       }).toList(),
@@ -171,53 +180,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               },
             ),
-            ProfileRow(
-              icon: Icons.cake,
-              label: "Birthday",
-              value: "${birthday.toLocal()}".split(' ')[0],
+            ListTile(
+              leading: const Icon(Icons.cake, color: Colors.blue),
+              title: const Text(
+                "Birthday",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text("${birthday.toLocal()}".split(' ')[0]),
+              trailing: const Icon(Icons.edit),
               onTap: pickBirthday,
             ),
-            ProfileRow(
-              icon: Icons.email,
-              label: "Email",
-              value: email,
-              onTap: editEmail,
-            ),
-            ProfileRow(
-              icon: Icons.phone,
-              label: "Phone",
-              value: phone,
+            ListTile(
+              leading: const Icon(Icons.phone, color: Colors.blue),
+              title: const Text(
+                "Phone",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(phone),
+              trailing: const Icon(Icons.edit),
               onTap: editPhone,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: logout,
+              icon: const Icon(Icons.logout),
+              label: const Text("Logout"),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class ProfileRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-
-  const ProfileRow({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.blue),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(value),
-      trailing: const Icon(Icons.edit),
-      onTap: onTap,
     );
   }
 }

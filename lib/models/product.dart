@@ -6,8 +6,8 @@ class Product {
   final IconData icon;
   final double price;
   final int stock;
-  final String category;
-  final String? description;
+  final String category; // NEW
+  final String? description; // NEW
 
   Product({
     required this.id,
@@ -26,7 +26,7 @@ class Product {
       icon: IconData(data['icon'], fontFamily: 'MaterialIcons'),
       price: (data['price'] as num).toDouble(),
       stock: data['stock'] ?? 10,
-      category: data['category'] ?? 'General',
+      category: data['category'] ?? "Uncategorized",
       description: data['description'],
     );
   }

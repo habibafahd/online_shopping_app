@@ -1,25 +1,73 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
-import 'main_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final Function(String) onCategoryTap;
 
-  // Removed 'const' from constructor
-  HomeScreen({super.key, required this.onCategoryTap});
+  const HomeScreen({super.key, required this.onCategoryTap});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String searchText = '';
 
   final List<Map<String, dynamic>> categories = [
-    {"icon": Icons.shopping_bag_outlined, "name": "Clothes"},
+    {"icon": Icons.checkroom, "name": "T-Shirt"},
+    {"icon": Icons.shopping_bag, "name": "Pants"},
+    {"icon": Icons.ac_unit, "name": "Jacket"},
+    {"icon": Icons.ac_unit, "name": "Dress"},
   ];
 
   @override
   Widget build(BuildContext context) {
+    List<Widget> categoryWidgets = categories
+        .where(
+          (item) =>
+              searchText.isEmpty ||
+              item["name"].toString().toLowerCase().contains(searchText),
+        )
+        .map((item) {
+          return Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            child: ListTile(
+              leading: Icon(item["icon"], size: 40, color: Colors.blue),
+              title: Text(
+                item["name"],
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () => widget.onCategoryTap(item["name"]),
+            ),
+          );
+        })
+        .toList();
+
+    if (searchText.isNotEmpty && categoryWidgets.isEmpty) {
+      categoryWidgets.add(
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 20),
+          child: Center(
+            child: Text(
+              "No products found",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "ShopEasy",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text("ShopEasy"),
         automaticallyImplyLeading: false,
       ),
       body: Padding(
@@ -27,6 +75,7 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Search bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
@@ -37,18 +86,31 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   const Icon(Icons.search),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: TextField(
-                      decoration: InputDecoration(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
                         hintText: "Search products...",
                         border: InputBorder.none,
                       ),
+                      onChanged: (value) {
+                        setState(() {
+                          searchText = value.trim().toLowerCase();
+                        });
+                      },
                     ),
                   ),
-                  IconButton(icon: const Icon(Icons.mic), onPressed: () {}),
+                  IconButton(
+                    icon: const Icon(Icons.mic),
+                    onPressed: () {
+                      // TODO: Implement voice search
+                    },
+                  ),
                   IconButton(
                     icon: const Icon(Icons.qr_code_scanner),
-                    onPressed: () {},
+                    onPressed: () {
+                      // TODO: Implement barcode scanner
+                    },
                   ),
                 ],
               ),
@@ -59,32 +121,7 @@ class HomeScreen extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 14),
-            Expanded(
-              child: ListView.builder(
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  final item = categories[index];
-                  return Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    child: ListTile(
-                      leading: Icon(item["icon"], size: 40, color: Colors.blue),
-                      title: Text(
-                        item["name"],
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () => onCategoryTap(item["name"]),
-                    ),
-                  );
-                },
-              ),
-            ),
+            Expanded(child: ListView(children: categoryWidgets)),
           ],
         ),
       ),

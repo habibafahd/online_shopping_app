@@ -61,7 +61,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             const SizedBox(height: 10),
             Row(
               children: sizes.map((size) {
-                final bool isSelected = selectedSize == size;
+                final isSelected = selectedSize == size;
                 return GestureDetector(
                   onTap: () => setState(() => selectedSize = size),
                   child: Container(
@@ -79,7 +79,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       size,
                       style: TextStyle(
                         color: isSelected ? Colors.white : Colors.blue,
-                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -93,25 +92,14 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text(
-              widget.product.description ?? "No description available",
-              style: const TextStyle(fontSize: 16),
-            ),
+            Text(widget.product.description ?? "No description available."),
             const Spacer(),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: () {
-                  widget.onAddToCart(widget.product, selectedSize);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        "Added ${widget.product.name} ($selectedSize) to cart",
-                      ),
-                    ),
-                  );
-                },
+                onPressed: () =>
+                    widget.onAddToCart(widget.product, selectedSize),
                 child: const Text(
                   "Add to Cart",
                   style: TextStyle(fontSize: 18),

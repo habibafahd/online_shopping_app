@@ -10,6 +10,8 @@ class DefaultFirebaseOptions {
       return FirebaseOptions(
         apiKey: "AIzaSyAMj4hBG08a2_OIR6dWtII22GOXmZKIW-8",
         authDomain: "online-shopping-app-7595d.firebaseapp.com",
+        databaseURL:
+            "https://online-shopping-app-7595d-default-rtdb.firebaseio.com",
         projectId: "online-shopping-app-7595d",
         storageBucket: "online-shopping-app-7595d.appspot.com",
         messagingSenderId: "561760250720",
@@ -20,9 +22,9 @@ class DefaultFirebaseOptions {
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return FirebaseOptions(
-          apiKey: "YOUR_ANDROID_API_KEY",
-          appId: "YOUR_ANDROID_APP_ID",
-          messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+          apiKey: "AIzaSyAMj4hBG08a2_OIR6dWtII22GOXmZKIW-8",
+          appId: "1:561760250720:android:70ddf91960f1c808fa8c05",
+          messagingSenderId: "561760250720",
           projectId: "online-shopping-app-7595d",
           storageBucket: "online-shopping-app-7595d.appspot.com",
         );
