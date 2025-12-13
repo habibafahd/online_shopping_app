@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'main_screen.dart';
+import 'admin_dashboard.dart'; // <-- Import your admin page
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final rememberedEmail = await _auth.getRememberedEmail();
     final rememberedPassword = await _auth.getRememberedPassword();
     final isRememberMeEnabled = await _auth.isRememberMeEnabled();
-    
+
     setState(() {
       if (rememberedEmail != null) {
         _emailController.text = rememberedEmail;
@@ -43,20 +44,35 @@ class _LoginScreenState extends State<LoginScreen> {
   void _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
-    
-    final user = await _auth.login(email, password);
-    if (user != null) {
-      // Save remember me data (email and password)
-      await _auth.saveRememberMeData(email, password, _rememberMe);
-      
-      Navigator.pushReplacement(
+
+    try {
+      // --- Normal login via Firebase ---
+      final user = await _auth.login(email, password);
+      if (user != null) {
+        // Save remember me data
+        await _auth.saveRememberMeData(email, password, _rememberMe);
+
+        // --- Check if admin ---
+        if (user.email == "admin_user@gmail.com" && password == "admin123") {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainScreen()),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login failed. Check email/password.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
         context,
-        MaterialPageRoute(builder: (_) => const MainScreen()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login failed. Check email/password.')),
-      );
+      ).showSnackBar(SnackBar(content: Text('Login error: $e')));
     }
   }
 
@@ -75,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
       body: Padding(
@@ -97,7 +113,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   value: _rememberMe,
                   onChanged: (value) async {
                     setState(() => _rememberMe = value!);
-                    // If unchecked, clear saved data
                     if (!value!) {
                       await _auth.clearRememberMeData();
                     }
