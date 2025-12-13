@@ -31,6 +31,7 @@ class ProductService {
       stock: data['stock'] ?? 0,
       description: data['description'],
       icon: getIconFromString(data['icon'] ?? 'category'),
+      barcode: data['barcode'] ?? '', // <-- add barcode here
     );
   }
 
@@ -56,7 +57,8 @@ class ProductService {
       'price': product.price,
       'stock': product.stock,
       'description': product.description,
-      'icon': product.iconString, // we’ll add this in Product model
+      'icon': product.iconString,
+      'barcode': product.barcode, // <-- include barcode
     });
   }
 
@@ -69,6 +71,7 @@ class ProductService {
       'stock': product.stock,
       'description': product.description,
       'icon': product.iconString,
+      'barcode': product.barcode, // <-- include barcode
     });
   }
 

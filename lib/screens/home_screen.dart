@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/product.dart';
-import '../services/product_service.dart';
-import 'product_list_page.dart';
+import '../screens/product_details_page.dart';
 
 class HomeScreen extends StatefulWidget {
   final Function(Product, String) onAddToCart;
@@ -25,10 +25,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   String searchText = '';
-  stt.SpeechToText _speech = stt.SpeechToText();
+  String? lastScannedBarcode;
+
+  final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
-  final ImagePicker _imagePicker = ImagePicker();
-  File? _selectedImage;
 
   final List<Map<String, dynamic>> categories = [
     {"icon": Icons.checkroom, "name": "T-Shirt"},
@@ -37,251 +37,97 @@ class _HomeScreenState extends State<HomeScreen> {
     {"icon": Icons.ac_unit, "name": "Dress"},
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _initializeSpeech();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _speech.stop();
-    super.dispose();
-  }
-
-  void _initializeSpeech() async {
-    bool available = await _speech.initialize(
-      onStatus: (status) {
-        if (status == 'done' || status == 'notListening') {
-          setState(() {
-            _isListening = false;
-          });
-        }
-      },
-      onError: (error) {
-        setState(() {
-          _isListening = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Speech recognition error: ${error.errorMsg}')),
-        );
-      },
-    );
-    if (!available) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Speech recognition not available')),
-      );
-    }
-  }
-
+  // ---------------- Voice Search ----------------
   void _startListening() async {
     if (!_isListening) {
-      bool available = await _speech.initialize();
-      if (available) {
-        setState(() {
-          _isListening = true;
-        });
-        _speech.listen(
-          onResult: (result) {
-            setState(() {
-              _searchController.text = result.recognizedWords;
-              searchText = result.recognizedWords.trim().toLowerCase();
-            });
-          },
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Speech recognition not available')),
-        );
-      }
+      final available = await _speech.initialize();
+      if (!available) return;
+
+      setState(() => _isListening = true);
+
+      _speech.listen(
+        onResult: (result) {
+          setState(() {
+            _searchController.text = result.recognizedWords;
+            searchText = result.recognizedWords.toLowerCase().trim();
+          });
+        },
+      );
     } else {
       _speech.stop();
-      setState(() {
-        _isListening = false;
-      });
+      setState(() => _isListening = false);
     }
   }
 
   void _stopListening() {
     _speech.stop();
-    setState(() {
-      _isListening = false;
-    });
+    setState(() => _isListening = false);
   }
 
-  Future<void> _pickImage() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
-      );
-      if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
-        _showImageSearchDialog();
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e')),
-      );
-    }
+  // ---------------- Firebase Barcode Lookup ----------------
+  Future<Product?> getProductByBarcode(String barcode) async {
+    final query = await FirebaseFirestore.instance
+        .collection('products')
+        .where('barcode', isEqualTo: barcode)
+        .limit(1)
+        .get();
+
+    if (query.docs.isEmpty) return null;
+
+    final doc = query.docs.first;
+    final data = doc.data();
+    return Product.fromMap(data as Map<String, dynamic>, doc.id);
   }
 
-  Future<void> _takePhoto() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 80,
-      );
-      if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
-        _showImageSearchDialog();
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error taking photo: $e')),
-      );
-    }
-  }
+  // ---------------- Barcode Scanner ----------------
+  void _openBarcodeScanner() {
+    widget.onOpenPage(
+      Scaffold(
+        appBar: AppBar(title: const Text('Scan Barcode')),
+        body: _ManualBarcodeScanner(
+          onCodeDetected: (scannedCode) async {
+            final matchedProduct = await getProductByBarcode(scannedCode);
 
-  void _showImageSearchDialog() {
-    if (_selectedImage == null) return;
-    
-    // Show dialog with the image and search options
-    // In a real app, you would use ML/vision API to identify the product
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Image Search'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.file(
-              _selectedImage!,
-              height: 200,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Image search feature would use ML to identify products. For now, you can search manually.',
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _selectedImage = null;
-              });
-            },
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              // In a real implementation, this would trigger ML-based search
-              // For now, we'll just clear the image
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Image search would identify products here'),
+            if (matchedProduct != null) {
+              // Close scanner first
+              Navigator.of(context).pop();
+
+              // Then open product details
+              widget.onOpenPage(
+                ProductDetailsPage(
+                  product: matchedProduct,
+                  onAddToCart: widget.onAddToCart,
+                  onBack: () => widget.onOpenPage(
+                    HomeScreen(
+                      onAddToCart: widget.onAddToCart,
+                      onOpenPage: widget.onOpenPage,
+                      onCategoryTap: widget.onCategoryTap,
+                    ),
+                  ),
                 ),
               );
+
               setState(() {
-                _selectedImage = null;
+                lastScannedBarcode = scannedCode;
               });
-            },
-            child: const Text('Search'),
-          ),
-        ],
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Product not found')),
+              );
+            }
+          },
+        ),
       ),
     );
   }
 
-  void _handleImageSearch() {
-    if (_selectedImage != null) {
-      _showImageSearchDialog();
-    } else {
-      // Show dialog to choose image source
-      showModalBottomSheet(
-        context: context,
-        builder: (BuildContext context) {
-          return SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.photo_library),
-                  title: const Text('Choose from Gallery'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.camera_alt),
-                  title: const Text('Take a Photo'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _takePhoto();
-                  },
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    List<Widget> categoryWidgets = categories
-        .where(
-          (item) =>
-              searchText.isEmpty ||
-              item["name"].toString().toLowerCase().contains(searchText),
-        )
-        .map<Widget>((item) {
-          return Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            margin: const EdgeInsets.symmetric(vertical: 8),
-            child: ListTile(
-              leading: Icon(item["icon"], size: 40, color: Colors.blue),
-              title: Text(
-                item["name"],
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () => widget.onCategoryTap(item["name"]),
-            ),
-          );
-        })
-        .toList();
-
-    if (searchText.isNotEmpty && categoryWidgets.isEmpty) {
-      categoryWidgets.add(
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 20),
-          child: Center(
-            child: Text(
-              "No products found",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-      );
-    }
+    final filteredCategories = categories.where(
+      (item) =>
+          searchText.isEmpty ||
+          item["name"].toString().toLowerCase().contains(searchText),
+    );
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -308,104 +154,104 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     onChanged: (value) {
                       setState(() {
-                        searchText = value.trim().toLowerCase();
+                        searchText = value.toLowerCase().trim();
                       });
                     },
                   ),
                 ),
-                // Voice search button
                 IconButton(
                   icon: Icon(
                     _isListening ? Icons.mic : Icons.mic_none,
                     color: _isListening ? Colors.red : Colors.grey[700],
                   ),
                   onPressed: _startListening,
-                  tooltip: 'Voice Search',
                 ),
-                // Image search button
                 IconButton(
-                  icon: Icon(
-                    _selectedImage != null ? Icons.image : Icons.image_outlined,
-                    color: _selectedImage != null ? Colors.blue : Colors.grey[700],
-                  ),
-                  onPressed: _handleImageSearch,
-                  tooltip: 'Image Search',
+                  icon: const Icon(Icons.qr_code_scanner),
+                  onPressed: _openBarcodeScanner,
                 ),
               ],
             ),
           ),
-          // Show selected image preview if available
-          if (_selectedImage != null)
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              height: 100,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue),
-              ),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      _selectedImage!,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () {
-                        setState(() {
-                          _selectedImage = null;
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
+
+          const SizedBox(height: 10),
+          if (lastScannedBarcode != null)
+            Text(
+              'Last scanned barcode: $lastScannedBarcode',
+              style: const TextStyle(fontSize: 14, color: Colors.green),
             ),
-          // Show listening indicator
-          if (_isListening)
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.mic, color: Colors.red),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Listening...',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: _stopListening,
-                    child: const Text('Stop'),
-                  ),
-                ],
-              ),
-            ),
+
           const SizedBox(height: 20),
           const Text(
             "Categories",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 14),
-          Expanded(child: ListView(children: categoryWidgets)),
+
+          Expanded(
+            child: ListView(
+              children: filteredCategories.map((item) {
+                return Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  child: ListTile(
+                    leading: Icon(item["icon"], size: 40, color: Colors.blue),
+                    title: Text(item["name"]),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () => widget.onCategoryTap(item["name"]),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------- Manual Barcode Scanner ----------------
+class _ManualBarcodeScanner extends StatefulWidget {
+  final Function(String) onCodeDetected;
+  const _ManualBarcodeScanner({required this.onCodeDetected});
+
+  @override
+  State<_ManualBarcodeScanner> createState() => _ManualBarcodeScannerState();
+}
+
+class _ManualBarcodeScannerState extends State<_ManualBarcodeScanner> {
+  final MobileScannerController _controller = MobileScannerController();
+  String? _scannedCode;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        MobileScanner(
+          controller: _controller,
+          onDetect: (capture) {
+            final code = capture.barcodes.first.rawValue;
+            if (code != null && _scannedCode == null) {
+              setState(() => _scannedCode = code);
+            }
+          },
+        ),
+        Positioned(
+          bottom: 20,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: ElevatedButton(
+              onPressed: _scannedCode == null
+                  ? null
+                  : () => widget.onCodeDetected(_scannedCode!),
+              child: const Text('Scan'),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -8,6 +8,7 @@ class Product {
   final int stock;
   final String? description;
   final IconData icon;
+  final String barcode; // <-- added barcode field
 
   Product({
     required this.id,
@@ -17,6 +18,7 @@ class Product {
     this.stock = 10,
     this.description,
     required this.icon,
+    required this.barcode, // <-- required
   });
 
   // Convert IconData to string for Firestore
@@ -51,6 +53,7 @@ class Product {
       stock: map['stock'] ?? 10,
       description: map['description'],
       icon: iconData,
+      barcode: map['barcode'] ?? '', // <-- set barcode from Firestore
     );
   }
 
@@ -63,6 +66,7 @@ class Product {
       'stock': stock,
       'description': description,
       'icon': iconString,
+      'barcode': barcode, // <-- include barcode in Firestore
     };
   }
 }

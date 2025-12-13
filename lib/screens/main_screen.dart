@@ -19,18 +19,20 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   List<CartItem> cart = [];
   late Widget currentScreen;
+  late HomeScreen homeScreen; // store reference for home page
 
   final ProductService _productService = ProductService();
 
   @override
   void initState() {
     super.initState();
-    // Start with HomeScreen and pass callbacks
-    currentScreen = HomeScreen(
+    // Initialize home screen
+    homeScreen = HomeScreen(
       onAddToCart: addToCart,
       onOpenPage: openScreen,
       onCategoryTap: onCategoryTap,
     );
+    currentScreen = homeScreen;
   }
 
   void openScreen(Widget screen) {
@@ -73,6 +75,7 @@ class _MainScreenState extends State<MainScreen> {
           products: products,
           onAddToCart: addToCart,
           onOpenPage: openScreen,
+          homePage: homeScreen, // <-- pass the home screen here
         ),
       );
     } catch (e) {
@@ -88,13 +91,7 @@ class _MainScreenState extends State<MainScreen> {
       CartScreen(
         cart: cart,
         onCartChanged: () => setState(() {}),
-        onBack: () => openScreen(
-          HomeScreen(
-            onAddToCart: addToCart,
-            onOpenPage: openScreen,
-            onCategoryTap: onCategoryTap,
-          ),
-        ),
+        onBack: () => openScreen(homeScreen),
       ),
     );
   }
@@ -115,13 +112,7 @@ class _MainScreenState extends State<MainScreen> {
           setState(() {
             _selectedIndex = index;
             if (index == 0) {
-              openScreen(
-                HomeScreen(
-                  onAddToCart: addToCart,
-                  onOpenPage: openScreen,
-                  onCategoryTap: onCategoryTap,
-                ),
-              );
+              openScreen(homeScreen);
             } else if (index == 1) {
               onCartTap();
             } else if (index == 2) {
