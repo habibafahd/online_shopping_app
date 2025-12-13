@@ -38,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
               searchText.isEmpty ||
               item["name"].toString().toLowerCase().contains(searchText),
         )
-        .map((item) {
+        .map<Widget>((item) {
           return Card(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),

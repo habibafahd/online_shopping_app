@@ -15,13 +15,40 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _rememberMe = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedEmail();
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final rememberedEmail = await _auth.getRememberedEmail();
+    final rememberedPassword = await _auth.getRememberedPassword();
+    final isRememberMeEnabled = await _auth.isRememberMeEnabled();
+    
+    setState(() {
+      if (rememberedEmail != null) {
+        _emailController.text = rememberedEmail;
+      }
+      if (rememberedPassword != null) {
+        _passwordController.text = rememberedPassword;
+      }
+      _rememberMe = isRememberMeEnabled;
+      _isLoading = false;
+    });
+  }
 
   void _login() async {
-    final user = await _auth.login(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    
+    final user = await _auth.login(email, password);
     if (user != null) {
+      // Save remember me data (email and password)
+      await _auth.saveRememberMeData(email, password, _rememberMe);
+      
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const MainScreen()),
@@ -42,6 +69,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Login')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
       body: Padding(
@@ -61,8 +95,12 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 Checkbox(
                   value: _rememberMe,
-                  onChanged: (value) {
+                  onChanged: (value) async {
                     setState(() => _rememberMe = value!);
+                    // If unchecked, clear saved data
+                    if (!value!) {
+                      await _auth.clearRememberMeData();
+                    }
                   },
                 ),
                 const Text('Remember me'),
