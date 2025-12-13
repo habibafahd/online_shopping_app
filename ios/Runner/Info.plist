@@ -45,5 +45,12 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Permissions for voice search and image search -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to microphone for voice search functionality.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to camera for image search functionality.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library for image search functionality.</string>
 </dict>
 </plist>
