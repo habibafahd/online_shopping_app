@@ -30,12 +30,49 @@ class _HomeScreenState extends State<HomeScreen> {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
 
-  final List<Map<String, dynamic>> categories = [
-    {"icon": Icons.checkroom, "name": "T-Shirt"},
-    {"icon": Icons.shopping_bag, "name": "Pants"},
-    {"icon": Icons.ac_unit, "name": "Jacket"},
-    {"icon": Icons.ac_unit, "name": "Dress"},
-  ];
+  // Categories fetched from Firebase
+  List<Map<String, dynamic>> categories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCategories();
+  }
+
+  // ---------------- Firebase Categories ----------------
+  Future<void> _fetchCategories() async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('categories')
+          .get();
+
+      final fetchedCategories = querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        IconData iconData;
+        switch (data['icon'] ?? '') {
+          case 'checkroom':
+            iconData = Icons.checkroom;
+            break;
+          case 'shopping_bag':
+            iconData = Icons.shopping_bag;
+            break;
+          case 'ac_unit':
+            iconData = Icons.ac_unit;
+            break;
+          default:
+            iconData = Icons.category;
+        }
+        return {"name": data['name'] ?? 'Unnamed', "icon": iconData};
+      }).toList();
+
+      setState(() => categories = fetchedCategories);
+    } catch (e) {
+      // handle error if needed
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to fetch categories')),
+      );
+    }
+  }
 
   // ---------------- Voice Search ----------------
   void _startListening() async {
@@ -89,10 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
             final matchedProduct = await getProductByBarcode(scannedCode);
 
             if (matchedProduct != null) {
-              // Close scanner first
               Navigator.of(context).pop();
 
-              // Then open product details
               widget.onOpenPage(
                 ProductDetailsPage(
                   product: matchedProduct,
