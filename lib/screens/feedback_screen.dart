@@ -48,7 +48,18 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                   rating: rating,
                   comment: comment,
                 );
-                widget.onFeedbackSubmitted();
+
+                // Navigate to home immediately after feedback
+                widget
+                    .onFeedbackSubmitted(); // This can clear cart in CheckoutScreen
+                if (Navigator.canPop(context)) {
+                  Navigator.popUntil(context, (route) => route.isFirst);
+                }
+
+                // Show SnackBar on home screen
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Thank you for your feedback!")),
+                );
               },
               child: const Text("Submit Feedback"),
             ),

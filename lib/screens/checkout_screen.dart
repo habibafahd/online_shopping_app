@@ -66,6 +66,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context); // close summary
+
+                // Clear cart immediately after order is confirmed
+                widget.cart.clear();
+                widget.onCartCleared();
+
                 // Go to FeedbackScreen
                 Navigator.pushReplacement(
                   context,
@@ -73,14 +78,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     builder: (_) => FeedbackScreen(
                       orderId: orderId,
                       onFeedbackSubmitted: () {
-                        widget.cart.clear();
-                        widget.onCartCleared();
-                        Navigator.pop(context); // go back after feedback
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Order placed successfully!"),
-                          ),
-                        );
+                        // The FeedbackScreen handles going back to home and showing the SnackBar
                       },
                     ),
                   ),

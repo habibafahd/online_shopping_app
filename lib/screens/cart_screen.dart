@@ -99,7 +99,8 @@ class _CartScreenState extends State<CartScreen> {
         builder: (_) => FeedbackScreen(
           orderId: orderId,
           onFeedbackSubmitted: () {
-            Navigator.pop(context);
+            // After feedback, go back to home
+            widget.onBack();
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text("Thank you for your feedback!")),
             );
