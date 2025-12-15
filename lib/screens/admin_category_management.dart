@@ -1,32 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class AdminCategoryManagement extends StatefulWidget {
-  const AdminCategoryManagement({super.key});
+class AdminCategoriesPage extends StatefulWidget {
+  const AdminCategoriesPage({super.key});
 
   @override
-  State<AdminCategoryManagement> createState() =>
-      _AdminCategoryManagementState();
+  State<AdminCategoriesPage> createState() => _AdminCategoriesPageState();
 }
 
-class _AdminCategoryManagementState extends State<AdminCategoryManagement> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+class _AdminCategoriesPageState extends State<AdminCategoriesPage> {
+  final CollectionReference _categoriesRef = FirebaseFirestore.instance
+      .collection('categories');
 
-  // Show dialog to add or edit a category
-  void _showCategoryForm({DocumentSnapshot? categoryDoc}) {
-    final nameController = TextEditingController(
-      text: categoryDoc != null
-          ? (categoryDoc.data() as Map<String, dynamic>)['name']
-          : '',
-    );
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
+
+  // ------------------ Add/Edit Category ------------------
+  void _showCategoryDialog({DocumentSnapshot? categoryDoc}) {
+    if (categoryDoc != null) {
+      _nameController.text = categoryDoc['name'];
+    } else {
+      _nameController.clear();
+    }
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(categoryDoc != null ? 'Edit Category' : 'Add Category'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(labelText: 'Category Name'),
+        title: Text(categoryDoc == null ? 'Add Category' : 'Edit Category'),
+        content: Form(
+          key: _formKey,
+          child: TextFormField(
+            controller: _nameController,
+            decoration: const InputDecoration(labelText: 'Category Name'),
+            validator: (v) => v == null || v.isEmpty ? 'Enter name' : null,
+          ),
         ),
         actions: [
           TextButton(
@@ -35,48 +42,59 @@ class _AdminCategoryManagementState extends State<AdminCategoryManagement> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Category name is required')),
-                );
-                return;
-              }
+              if (!_formKey.currentState!.validate()) return;
 
-              if (categoryDoc != null) {
-                // Update category
-                await _firestore
-                    .collection('categories')
-                    .doc(categoryDoc.id)
-                    .update({'name': name});
-              } else {
-                // Add new category
-                await _firestore.collection('categories').add({'name': name});
-              }
+              final name = _nameController.text.trim();
 
-              Navigator.pop(context);
+              try {
+                if (categoryDoc == null) {
+                  // Add new category
+                  await _categoriesRef.add({'name': name});
+                } else {
+                  // Edit existing category
+                  await _categoriesRef.doc(categoryDoc.id).update({
+                    'name': name,
+                  });
+                }
+                Navigator.pop(context);
+              } catch (e) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
             },
-            child: Text(categoryDoc != null ? 'Update' : 'Add'),
+            child: Text(categoryDoc == null ? 'Add' : 'Save'),
           ),
         ],
       ),
     );
   }
 
-  // Delete category
-  void _deleteCategory(String docId) async {
-    await _firestore.collection('categories').doc(docId).delete();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Category deleted')));
+  // ------------------ Delete Category ------------------
+  void _deleteCategory(String id) async {
+    try {
+      await _categoriesRef.doc(id).delete();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Category deleted')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+    }
   }
 
+  // ------------------ UI ------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin Category Management')),
+      appBar: AppBar(title: const Text('Admin - Categories')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCategoryDialog(),
+        child: const Icon(Icons.add),
+      ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore.collection('categories').snapshots(),
+        stream: _categoriesRef.snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -84,37 +102,36 @@ class _AdminCategoryManagementState extends State<AdminCategoryManagement> {
 
           final categories = snapshot.data!.docs;
 
+          if (categories.isEmpty) {
+            return const Center(child: Text('No categories found'));
+          }
+
           return ListView.builder(
             itemCount: categories.length,
             itemBuilder: (context, index) {
-              final categoryDoc = categories[index];
-              final categoryData = categoryDoc.data() as Map<String, dynamic>;
-
-              return ListTile(
-                title: Text(categoryData['name']),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      onPressed: () =>
-                          _showCategoryForm(categoryDoc: categoryDoc),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _deleteCategory(categoryDoc.id),
-                    ),
-                  ],
+              final c = categories[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: ListTile(
+                  title: Text(c['name']),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.orange),
+                        onPressed: () => _showCategoryDialog(categoryDoc: c),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _deleteCategory(c.id),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCategoryForm(),
-        child: const Icon(Icons.add),
-        tooltip: 'Add Category',
       ),
     );
   }

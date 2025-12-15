@@ -18,7 +18,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   final List<Widget> _pages = const [
     AdminProductsPage(),
-    AdminCategoryManagement(),
+    AdminCategoriesPage(),
     AdminReports(),
   ];
 
