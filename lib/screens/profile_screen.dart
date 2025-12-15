@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
+import '../services/profile_service.dart';
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -11,14 +11,13 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String gender = "Male";
   DateTime birthday = DateTime(2000, 1, 1);
-  String phone = "";
   String username = "@username";
 
   final AuthService auth = AuthService();
-  final _firestore = FirebaseFirestore.instance;
+  final ProfileService profileService = ProfileService();
   late String userId;
+  final String birthdayId = "mainBirthday"; // only one birthday per user
 
   @override
   void initState() {
@@ -27,44 +26,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final email = auth.currentUserEmail();
     if (uid != null && email != null) {
       userId = uid;
-      username = email.split('@')[0]; // username from email
-      _loadUserData();
+      username = email.split('@')[0];
+      _loadBirthday();
+    } else {
+      print("User not logged in!");
     }
   }
 
-  Future<void> _loadUserData() async {
-    try {
-      final doc = await _firestore.collection('users').doc(userId).get();
-      if (doc.exists) {
-        final data = doc.data()!;
-        setState(() {
-          phone = data['phone'] ?? '';
-          gender = data['gender'] ?? 'Male';
-          birthday = (data['birthday'] as Timestamp?)?.toDate() ?? birthday;
-          // username stays as email prefix
-        });
-      } else {
-        // create default document
-        await _firestore.collection('users').doc(userId).set({
-          'phone': phone,
-          'gender': gender,
-          'birthday': Timestamp.fromDate(birthday),
-          'username': username, // from email
-        });
-      }
-    } catch (e) {
-      print("Error loading user data: $e");
+  Future<void> _loadBirthday() async {
+    final loadedBirthday = await profileService.loadBirthday(
+      userId: userId,
+      birthdayId: birthdayId,
+    );
+    if (loadedBirthday != null) {
+      setState(() => birthday = loadedBirthday);
+    } else {
+      print("No birthday found yet for $userId");
     }
   }
 
-  Future<void> _updateUserData() async {
-    if (userId.isEmpty) return; // safety check
-    await _firestore.collection('users').doc(userId).set({
-      'phone': phone,
-      'gender': gender,
-      'birthday': Timestamp.fromDate(birthday),
-      'username': username,
-    }, SetOptions(merge: true));
+  Future<void> _updateBirthday(DateTime newBirthday) async {
+    await profileService.addBirthday(
+      userId: userId,
+      birthdayId: birthdayId,
+      date: newBirthday,
+    );
   }
 
   Future<void> pickBirthday() async {
@@ -76,36 +62,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (picked != null && picked != birthday) {
       setState(() => birthday = picked);
-      await _updateUserData(); // save immediately
+      await _updateBirthday(picked); // save immediately
     }
-  }
-
-  void editPhone() {
-    TextEditingController controller = TextEditingController(text: phone);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Edit Phone"),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.phone,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () async {
-              setState(() => phone = controller.text);
-              await _updateUserData();
-              Navigator.pop(context);
-            },
-            child: const Text("Save"),
-          ),
-        ],
-      ),
-    );
   }
 
   void logout() async {
@@ -128,7 +86,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Center(
               child: Column(
                 children: [
-                  const CircleAvatar(radius: 50, backgroundColor: Colors.grey),
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey,
+                    child: Text(
+                      username.isNotEmpty ? username[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        fontSize: 40,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     username,
@@ -147,40 +116,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 30),
             ListTile(
-              leading: const Icon(Icons.male, color: Colors.blue),
-              title: const Text(
-                "Gender",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Text(gender),
-              trailing: const Icon(Icons.edit),
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text("Select Gender"),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: ["Male", "Female"].map((g) {
-                        return RadioListTile(
-                          value: g,
-                          groupValue: gender,
-                          title: Text(g),
-                          onChanged: (String? val) async {
-                            if (val != null) {
-                              setState(() => gender = val);
-                              await _updateUserData();
-                              Navigator.pop(context);
-                            }
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                );
-              },
-            ),
-            ListTile(
               leading: const Icon(Icons.cake, color: Colors.blue),
               title: const Text(
                 "Birthday",
@@ -189,16 +124,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               subtitle: Text("${birthday.toLocal()}".split(' ')[0]),
               trailing: const Icon(Icons.edit),
               onTap: pickBirthday,
-            ),
-            ListTile(
-              leading: const Icon(Icons.phone, color: Colors.blue),
-              title: const Text(
-                "Phone",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Text(phone),
-              trailing: const Icon(Icons.edit),
-              onTap: editPhone,
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
