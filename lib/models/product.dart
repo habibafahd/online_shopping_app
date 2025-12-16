@@ -8,7 +8,7 @@ class Product {
   final int stock;
   final String? description;
   final IconData icon;
-  final String barcode; // <-- added barcode field
+  final String barcode;
 
   Product({
     required this.id,

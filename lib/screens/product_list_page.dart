@@ -11,7 +11,7 @@ class ProductListPage extends StatefulWidget {
   final List<Product> products;
   final Function(Product, String) onAddToCart;
   final Function(Widget) onOpenPage;
-  final Widget homePage; // <-- required home page reference
+  final Widget homePage;
 
   const ProductListPage({
     super.key,
@@ -19,7 +19,7 @@ class ProductListPage extends StatefulWidget {
     required this.products,
     required this.onAddToCart,
     required this.onOpenPage,
-    required this.homePage, // <-- constructor requires homePage
+    required this.homePage,
   });
 
   @override
@@ -29,43 +29,33 @@ class ProductListPage extends StatefulWidget {
 class _ProductListPageState extends State<ProductListPage> {
   final TextEditingController _searchController = TextEditingController();
   String searchText = "";
-  stt.SpeechToText _speech = stt.SpeechToText();
+  late stt.SpeechToText _speech;
   bool _isListening = false;
 
   @override
   void initState() {
     super.initState();
+    _speech = stt.SpeechToText();
     _initializeSpeech();
-
-    // Chrome/web back button handling
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // listen to browser back button
-      ModalRoute.of(context)?.addScopedWillPopCallback(_onWillPop);
-    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _speech.stop();
-    ModalRoute.of(context)?.removeScopedWillPopCallback(_onWillPop);
     super.dispose();
-  }
-
-  // Chrome back button handler
-  Future<bool> _onWillPop() async {
-    widget.onOpenPage(widget.homePage); // navigate back to home page
-    return false; // prevent default back
   }
 
   void _initializeSpeech() async {
     bool available = await _speech.initialize(
       onStatus: (status) {
+        if (!mounted) return;
         if (status == 'done' || status == 'notListening') {
           setState(() => _isListening = false);
         }
       },
       onError: (error) {
+        if (!mounted) return;
         setState(() => _isListening = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -74,7 +64,8 @@ class _ProductListPageState extends State<ProductListPage> {
         );
       },
     );
-    if (!available) {
+
+    if (!available && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Speech recognition not available')),
       );
@@ -82,35 +73,34 @@ class _ProductListPageState extends State<ProductListPage> {
   }
 
   void _startListening() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize();
-      if (available) {
-        setState(() => _isListening = true);
-        _speech.listen(
-          onResult: (result) {
-            setState(() {
-              _searchController.text = result.recognizedWords;
-              searchText = result.recognizedWords.trim().toLowerCase();
-            });
-          },
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Speech recognition not available')),
-        );
-      }
-    } else {
-      _speech.stop();
-      setState(() => _isListening = false);
+    if (_isListening) return;
+    bool available = await _speech.initialize();
+    if (!available && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Speech recognition not available')),
+      );
+      return;
     }
+    if (!mounted) return;
+    setState(() => _isListening = true);
+
+    _speech.listen(
+      onResult: (result) {
+        if (!mounted) return;
+        setState(() {
+          _searchController.text = result.recognizedWords;
+          searchText = result.recognizedWords.trim().toLowerCase();
+        });
+      },
+    );
   }
 
   void _stopListening() {
     _speech.stop();
+    if (!mounted) return;
     setState(() => _isListening = false);
   }
 
-  // ---------------- Fetch product by barcode from Firestore ----------------
   Future<Product?> _fetchProductByBarcode(String barcode) async {
     try {
       final query = await FirebaseFirestore.instance
@@ -120,25 +110,25 @@ class _ProductListPageState extends State<ProductListPage> {
           .get();
 
       if (query.docs.isEmpty) return null;
-
       final doc = query.docs.first;
       final data = doc.data();
       return Product.fromMap(data as Map<String, dynamic>, doc.id);
     } catch (e) {
+      print("Error fetching product by barcode: $e");
       return null;
     }
   }
 
-  // ---------------- Barcode Scanner ----------------
   void _openBarcodeScanner() {
     widget.onOpenPage(
       Scaffold(
         appBar: AppBar(title: const Text('Scan Barcode')),
         body: _ManualBarcodeScanner(
           onCodeDetected: (scannedCode) async {
+            if (!mounted) return;
             Navigator.pop(context); // close scanner
-
             final matchedProduct = await _fetchProductByBarcode(scannedCode);
+            if (!mounted) return;
 
             if (matchedProduct != null) {
               widget.onOpenPage(
@@ -148,7 +138,7 @@ class _ProductListPageState extends State<ProductListPage> {
                   onBack: () => widget.onOpenPage(widget),
                 ),
               );
-            } else {
+            } else if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Product not found')),
               );
@@ -165,134 +155,141 @@ class _ProductListPageState extends State<ProductListPage> {
       return p.name.toLowerCase().contains(searchText.toLowerCase());
     }).toList();
 
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          // Search + voice + scan
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.grey[200],
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.search),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: "Search in category...",
-                      border: InputBorder.none,
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        searchText = value.trim().toLowerCase();
-                      });
-                    },
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    _isListening ? Icons.mic : Icons.mic_none,
-                    color: _isListening ? Colors.red : Colors.grey[700],
-                  ),
-                  onPressed: _startListening,
-                  tooltip: 'Voice Search',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.qr_code_scanner),
-                  onPressed: _openBarcodeScanner,
-                  tooltip: 'Scan Barcode',
-                ),
-              ],
-            ),
-          ),
-          if (_isListening)
+    return WillPopScope(
+      onWillPop: () async {
+        widget.onOpenPage(widget.homePage);
+        return false;
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            // Search + Voice + Scan
             Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red),
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.grey[200],
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.mic, color: Colors.red),
+                  const Icon(Icons.search),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Listening...',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
+                        hintText: "Search in category...",
+                        border: InputBorder.none,
+                      ),
+                      onChanged: (value) {
+                        if (!mounted) return;
+                        setState(() {
+                          searchText = value.trim().toLowerCase();
+                        });
+                      },
                     ),
                   ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: _stopListening,
-                    child: const Text('Stop'),
+                  IconButton(
+                    icon: Icon(
+                      _isListening ? Icons.mic : Icons.mic_none,
+                      color: _isListening ? Colors.red : Colors.grey[700],
+                    ),
+                    onPressed: _isListening ? _stopListening : _startListening,
+                    tooltip: 'Voice Search',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: _openBarcodeScanner,
+                    tooltip: 'Scan Barcode',
                   ),
                 ],
               ),
             ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: GridView.builder(
-              itemCount: filteredProducts.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.8,
-              ),
-              itemBuilder: (context, index) {
-                final product = filteredProducts[index];
-                return GestureDetector(
-                  onTap: () {
-                    widget.onOpenPage(
-                      ProductDetailsPage(
-                        product: product,
-                        onAddToCart: widget.onAddToCart,
-                        onBack: () => widget.onOpenPage(widget),
+            if (_isListening)
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.mic, color: Colors.red),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Listening...',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
-                  child: Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(product.icon, size: 60, color: Colors.blue),
-                        const SizedBox(height: 10),
-                        Text(
-                          product.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "\$${product.price}",
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.blue,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                    const Spacer(),
+                    TextButton(
+                      onPressed: _stopListening,
+                      child: const Text('Stop'),
                     ),
-                  ),
-                );
-              },
+                  ],
+                ),
+              ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: GridView.builder(
+                itemCount: filteredProducts.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.8,
+                ),
+                itemBuilder: (context, index) {
+                  final product = filteredProducts[index];
+                  return GestureDetector(
+                    onTap: () {
+                      widget.onOpenPage(
+                        ProductDetailsPage(
+                          product: product,
+                          onAddToCart: widget.onAddToCart,
+                          onBack: () => widget.onOpenPage(widget),
+                        ),
+                      );
+                    },
+                    child: Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(product.icon, size: 60, color: Colors.blue),
+                          const SizedBox(height: 10),
+                          Text(
+                            product.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "\$${product.price}",
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -301,7 +298,6 @@ class _ProductListPageState extends State<ProductListPage> {
 // ---------------- Manual Barcode Scanner ----------------
 class _ManualBarcodeScanner extends StatefulWidget {
   final Function(String) onCodeDetected;
-
   const _ManualBarcodeScanner({required this.onCodeDetected});
 
   @override

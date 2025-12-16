@@ -4,6 +4,7 @@ import 'login_screen.dart';
 import 'admin_product_management.dart';
 import 'admin_category_management.dart';
 import 'admin_reports_page.dart';
+import 'admin_feedback_page.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -19,17 +20,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final List<Widget> _pages = const [
     AdminProductsPage(),
     AdminCategoriesPage(),
-    AdminReports(),
+    AdminReportsPage(),
+    AdminFeedbackPage(),
   ];
 
-  final List<String> _titles = ['Products', 'Categories', 'Reports'];
+  final List<String> _titles = [
+    'Products',
+    'Categories',
+    'Reports',
+    'Feedback',
+  ];
 
   void _logout() async {
-    await _auth.logout(); // Sign out from Firebase
+    await _auth.logout();
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false, // Remove all previous routes
+      (route) => false,
     );
   }
 
@@ -50,6 +57,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
+        selectedItemColor: Colors.blue,
+        unselectedItemColor: Colors.grey,
+        backgroundColor: Colors.white,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_bag),
@@ -62,6 +72,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),
             label: 'Reports',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.feedback),
+            label: 'Feedback',
           ),
         ],
       ),
