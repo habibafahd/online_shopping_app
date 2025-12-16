@@ -20,7 +20,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final List<Widget> _pages = const [
     AdminProductsPage(),
     AdminCategoriesPage(),
-    AdminReportsPage(),
+    AdminOrdersPage(),
     AdminFeedbackPage(),
   ];
 

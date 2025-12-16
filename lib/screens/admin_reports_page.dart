@@ -1,99 +1,122 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
-class AdminReportsPage extends StatefulWidget {
-  const AdminReportsPage({super.key});
+class AdminOrdersPage extends StatefulWidget {
+  const AdminOrdersPage({super.key});
 
   @override
-  State<AdminReportsPage> createState() => _AdminReportsPageState();
+  State<AdminOrdersPage> createState() => _AdminOrdersPageState();
 }
 
-class _AdminReportsPageState extends State<AdminReportsPage> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final List<Map<String, dynamic>> _allFeedback = [];
+class _AdminOrdersPageState extends State<AdminOrdersPage> {
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  DateTime? _selectedDate;
 
-  @override
-  void initState() {
-    super.initState();
-    print("AdminReports initialized");
-    _fetchAllFeedback();
+  void _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
   }
 
-  // ------------------ Fetch all feedback ------------------
-  Future<void> _fetchAllFeedback() async {
-    print("Fetching all feedbacks...");
-
-    final usersSnap = await _firestore.collection('users').get();
-    if (usersSnap.docs.isEmpty) {
-      print("Users collection is empty!");
-      return;
-    }
-    print("Total users found: ${usersSnap.docs.length}");
-
-    for (var userDoc in usersSnap.docs) {
-      final ordersSnap = await userDoc.reference.collection('orders').get();
-      print("User: ${userDoc.id} - Orders fetched: ${ordersSnap.docs.length}");
-
-      for (var orderDoc in ordersSnap.docs) {
-        final feedbackSnap = await orderDoc.reference
-            .collection('feedback')
-            .get();
-
-        if (feedbackSnap.docs.isEmpty) {
-          print("User: ${userDoc.id} - No feedback in order ${orderDoc.id}");
-          continue;
-        }
-
-        for (var fbDoc in feedbackSnap.docs) {
-          final fbData = fbDoc.data();
-          fbData['userId'] = userDoc.id;
-          fbData['orderId'] = orderDoc.id;
-          setState(() {
-            _allFeedback.add(fbData);
-          });
-          print(
-            "User: ${userDoc.id} - Order: ${orderDoc.id} - Feedback: ${fbData['comment']} (Rating: ${fbData['rating']})",
-          );
-        }
-      }
-    }
-
-    print("Total feedback entries fetched: ${_allFeedback.length}");
-  }
-
-  // ------------------ UI ------------------
   @override
   Widget build(BuildContext context) {
+    String? dateFilterText = _selectedDate != null
+        ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
+        : null;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin - Feedback Reports')),
-      body: _allFeedback.isEmpty
-          ? const Center(child: Text('No feedback found.'))
-          : ListView.builder(
-              itemCount: _allFeedback.length,
-              itemBuilder: (context, index) {
-                final feedback = _allFeedback[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  child: ListTile(
-                    title: Text("User: ${feedback['userId']}"),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Order ID: ${feedback['orderId']}"),
-                        const SizedBox(height: 4),
+      appBar: AppBar(
+        title: const Text('Admin - Orders'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: _pickDate,
+            tooltip: 'Select Date',
+          ),
+        ],
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _db.collectionGroup('orders').snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final orderDocs = snapshot.data!.docs;
+
+          // Filter orders by selected date
+          final filteredOrders = _selectedDate != null
+              ? orderDocs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  if (data['date'] == null) return false;
+                  final Timestamp ts = data['date'];
+                  final orderDate = ts.toDate();
+                  return orderDate.year == _selectedDate!.year &&
+                      orderDate.month == _selectedDate!.month &&
+                      orderDate.day == _selectedDate!.day;
+                }).toList()
+              : orderDocs;
+
+          if (filteredOrders.isEmpty) {
+            return Center(
+              child: Text(
+                _selectedDate != null
+                    ? 'No orders found on $dateFilterText'
+                    : 'No orders found',
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: filteredOrders.length,
+            itemBuilder: (context, index) {
+              final orderDoc = filteredOrders[index];
+              final data = orderDoc.data() as Map<String, dynamic>;
+              final pathSegments = orderDoc.reference.path.split('/');
+              final userId = pathSegments[1];
+              final orderId = pathSegments[3];
+
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                child: ListTile(
+                  leading: const Icon(Icons.shopping_cart),
+                  title: Text('Order ID: $orderId'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('User ID: $userId'),
+                      Text('Address: ${data['address'] ?? 'N/A'}'),
+                      Text('Phone: ${data['phone'] ?? 'N/A'}'),
+                      Text('Total: \$${data['total']?.toString() ?? '0.00'}'),
+                      if (data['date'] != null)
                         Text(
-                          "Feedback: ${feedback['comment'] ?? 'No comment'}",
+                          (data['date'] as Timestamp)
+                              .toDate()
+                              .toLocal()
+                              .toString(),
+                          style: const TextStyle(fontSize: 12),
                         ),
-                        Text("Rating: ${feedback['rating'] ?? 'N/A'}"),
-                      ],
-                    ),
+                      Text('Items: ${data['items']?.join(', ') ?? 'No items'}'),
+                    ],
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
