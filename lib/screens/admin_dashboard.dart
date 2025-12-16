@@ -5,6 +5,7 @@ import 'admin_product_management.dart';
 import 'admin_category_management.dart';
 import 'admin_reports_page.dart';
 import 'admin_feedback_page.dart';
+import 'admin_best_selling_page.dart'; // <-- imported the new page
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -22,6 +23,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     AdminCategoriesPage(),
     AdminOrdersPage(),
     AdminFeedbackPage(),
+    AdminBestSellingPage(), // <-- added best-selling chart page
   ];
 
   final List<String> _titles = [
@@ -29,6 +31,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     'Categories',
     'Reports',
     'Feedback',
+    'Best Selling Products', // <-- title for new page
   ];
 
   void _logout() async {
@@ -76,6 +79,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
           BottomNavigationBarItem(
             icon: Icon(Icons.feedback),
             label: 'Feedback',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.show_chart),
+            label: 'Best Selling',
           ),
         ],
       ),

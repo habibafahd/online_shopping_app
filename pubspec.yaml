@@ -30,6 +30,7 @@ dependencies:
   # Charts
   syncfusion_flutter_charts: ^31.2.18
   syncfusion_flutter_core: ^31.2.18
+  fl_chart: ^1.1.1
 
   # Cupertino icons
   cupertino_icons: ^1.0.8
